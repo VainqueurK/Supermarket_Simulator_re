@@ -3,11 +3,21 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"runtime"
 	"time"
 )
 
 var tills []till
-var customers = make(chan customer)
+var customers = make([]customer, 100)
+var lastCustomerGenerated = time.Now()
+var clock = time.Now()
+var totalCustomers = 0
+var currentNumOfCharacters = 0
+
+type automatic struct {
+	running        bool
+	generationRate float64
+}
 
 type customer struct {
 	numOfItems int
@@ -29,7 +39,7 @@ func (m *manager) GenerateTills() {
 	//generate random number for the num of tills
 	max := 8.0
 	min := 1.0
-	numOfTills := RandomNumberInclusive(min, max)
+	numOfTills := randomNumberInclusive(min, max)
 	tills = make([]till, numOfTills)
 
 	maxItemsTill := 1
@@ -37,7 +47,7 @@ func (m *manager) GenerateTills() {
 	for i := 0; i < numOfTills; i++ {
 		tills[i] = till{}
 		//randomly decide if the till has a max number of items
-		maxItemsTill = RandomNumberInclusive(1, 100)
+		maxItemsTill = randomNumberInclusive(1, 100)
 		if maxItemsTill > 20 {
 			tills[i].SetUpTill(false)
 		} else {
@@ -54,7 +64,7 @@ func (t *till) SetUpTill(maxItemsTill bool) {
 		t.numOfItems = 100
 	}
 	//adds cashier with a randomly generated speed to the till
-	t.employee = cashier{RandomNumberInclusive(1, 10)}
+	t.employee = cashier{randomNumberInclusive(1, 10)}
 	//the tills queue
 	t.queue = make(chan customer, 6)
 }
@@ -83,28 +93,54 @@ func (t *till) AddCustomerToQueue(c customer) bool {
 	}
 }
 
-func main() {
-	rand.Seed(time.Now().UnixNano())
-	//create manager and generate tills
-	manager := manager{}
-	manager.GenerateTills()
-	fmt.Println(tills)
+func (a *automatic) GenerateCustomers() {
+	for a.running {
+		time.Sleep(1 * time.Millisecond)
+		if time.Now().Sub(lastCustomerGenerated) > (time.Millisecond * 100) {
+			customer := customer{randomNumberInclusive(1, 100)}
+			customers[currentNumOfCharacters] = customer
+			currentNumOfCharacters++
+			totalCustomers++
+			lastCustomerGenerated = time.Now()
+		}
+	}
+	fmt.Println("wtf why am i here")
+}
 
-	//test adding customers to queues until they're full
-	for i := 0; i < 30; i++ {
-		customer := customer{RandomNumberInclusive(1, 100)}
-		for j := 0; j < len(tills); j++ {
+func (a *automatic) LookForSpaceInQueue() {
+	customer := customers[0]
+	for i := 0; i < len(tills); i++ {
+		if customer.numOfItems <= tills[i].numOfItems {
 			//if customer is added break out of the loop
-			if tills[j].AddCustomerToQueue(customer) {
+			if tills[i].AddCustomerToQueue(customer) {
 				break
 			}
 		}
 	}
-	for i := 0; i < len(tills); i++ {
-		fmt.Println(len(tills[i].queue))
-	}
 }
 
-func RandomNumberInclusive(min, max float64) int {
+func (a *automatic) RunSimulator() {
+	a.running = true
+	manager := manager{}
+	manager.GenerateTills()
+	go a.GenerateCustomers()
+	go a.LookForSpaceInQueue()
+	time.Sleep(5 * time.Second)
+}
+
+func main() {
+	rand.Seed(time.Now().UnixNano())
+	//create manager and generate tills
+	automatic := automatic{}
+	automatic.RunSimulator()
+
+	fmt.Println(tills)
+	fmt.Println(fmt.Println(runtime.NumGoroutine()))
+
+	automatic.running = false
+	fmt.Println(len(customers))
+}
+
+func randomNumberInclusive(min, max float64) int {
 	return int(min + rand.Float64()*(max-min))
 }
