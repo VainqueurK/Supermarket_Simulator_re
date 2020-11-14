@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"runtime"
 	"time"
@@ -17,9 +18,9 @@ var lastCustomerGenerated = time.Now()
 var clock = time.Now()
 var totalCustomers = 0
 var currentNumOfCustomers = 0
+var running = true
 
 type automatic struct {
-	running        bool
 	generationRate float64
 }
 
@@ -35,19 +36,21 @@ type till struct {
 	numOfItems int
 	employee   cashier
 	queue      chan customer
+	name       int
 }
 
 type manager struct{}
 
 func (c *cashier) ScanItems(customer customer) {
-	//scanTime := customer.numOfItems * c.scanSpeed - this isn't working atm
-	time.Sleep(1000 * time.Millisecond)
+	scanTime := customer.numOfItems * c.scanSpeed
+	time.Sleep(time.Duration(scanTime) * time.Millisecond)
+	//fmt.Println("scanned items")
 }
 
 func (t *till) AddCustomerToQueue(c customer) bool {
 	//checks if queue is full
 	if len(t.queue) == cap(t.queue) {
-		fmt.Println("queue full")
+		//fmt.Println("queue full")
 		return false
 	} else {
 		//adds customer to queue
@@ -57,15 +60,18 @@ func (t *till) AddCustomerToQueue(c customer) bool {
 }
 
 func (t *till) ProcessCustomer() {
-	//checks if queue is empty
-	if len(t.queue) == 0 {
-		fmt.Println("queue empty")
-	} else {
-		//removes customer from queue
-		currentCustomer := <-t.queue
-		fmt.Println(currentCustomer)
-		//call a method for the cashier to start scanning items
-		t.employee.ScanItems(currentCustomer)
+	for running {
+		time.Sleep(10 * time.Millisecond)
+		//checks if queue is empty
+		if len(t.queue) == 0 {
+			//fmt.Println("queue empty")
+		} else {
+			//removes customer from queue
+			currentCustomer := <-t.queue
+			fmt.Printf("Scanning %d items in Till %d\n", currentCustomer.numOfItems, t.name)
+			//call a method for the cashier to start scanning items
+			t.employee.ScanItems(currentCustomer)
+		}
 	}
 }
 
@@ -92,7 +98,7 @@ func (m *manager) GenerateTills() {
 	maxItemsTill := 1
 	//generate tills and add them to till array and then set them up
 	for i := 0; i < numOfTills; i++ {
-		tills[i] = till{}
+		tills[i] = till{name: (i + 1)}
 		//randomly decide if the till has a max number of items
 		maxItemsTill = randomNumberInclusive(1, 100)
 		if maxItemsTill > 20 {
@@ -104,27 +110,40 @@ func (m *manager) GenerateTills() {
 }
 
 func (a *automatic) LookForSpaceInQueue() {
-	//wait a few seconds before sorting customers into queues
-	time.Sleep(time.Second * 5)
-	for a.running {
-		customer := customers[0]
-		for i := 0; i < len(tills); i++ {
-			//if customer num of items is under the max num of items allowed at the till
-			if customer.numOfItems <= tills[i].numOfItems {
+	for running {
+		//check if customers are waiting
+		if len(customers) > 0 {
+			customer := customers[0]
+			//find the shortest queue available
+			index := shortestAvailableQueue(customer.numOfItems)
+			if index == -1 {
+				fmt.Println("no available queue")
+			} else {
 				//if customer is added break out of the loop
-				if tills[i].AddCustomerToQueue(customer) {
+				if tills[index].AddCustomerToQueue(customer) {
 					customers = customers[1:]
 					currentNumOfCustomers--
-					break
 				}
 			}
-			time.Sleep(time.Millisecond * 50)
 		}
 	}
 }
 
+func shortestAvailableQueue(numOfItems int) int {
+	min := math.MaxInt32
+	var tillIndex = -1
+	//loop through array and find till with the shortest queue that the customer can go to
+	for i := 0; i < len(tills); i++ {
+		if len(tills[i].queue) < min && numOfItems <= tills[i].numOfItems {
+			min = len(tills[i].queue)
+			tillIndex = i
+		}
+	}
+	return tillIndex
+}
+
 func (a *automatic) GenerateCustomers() {
-	for a.running {
+	for running {
 		time.Sleep(1 * time.Millisecond)
 		//if a certain amount of time has passed since the last customer was generated generate a new customer
 		if time.Now().Sub(lastCustomerGenerated) > (time.Millisecond * 100) {
@@ -140,7 +159,7 @@ func (a *automatic) GenerateCustomers() {
 }
 
 func (a *automatic) RunSimulator() {
-	a.running = true
+	running = true
 	//create manager agent and generate tills
 	manager := manager{}
 	manager.GenerateTills()
@@ -150,10 +169,10 @@ func (a *automatic) RunSimulator() {
 	go a.LookForSpaceInQueue()
 
 	//commented lines don't work yet
-	//for i := 0; i < len(tills); i++ {
-	//	go tills[i].ProcessCustomer()
-	//}
-	time.Sleep(5 * time.Second)
+	for i := 0; i < len(tills); i++ {
+		go tills[i].ProcessCustomer()
+	}
+	time.Sleep(10 * time.Second)
 }
 
 func main() {
@@ -161,14 +180,16 @@ func main() {
 	//run simulator
 	automatic := automatic{}
 	automatic.RunSimulator()
-
+	//stop automatic processes
 	fmt.Println(tills)
 	fmt.Println(fmt.Println(runtime.NumGoroutine()))
-	//stop automatic processes
-	automatic.running = false
-	fmt.Println(len(customers))
+	running = false
+	fmt.Printf("Current customers: %d, %d\n", len(customers), currentNumOfCustomers)
+	fmt.Printf("Total number of customers: %d", totalCustomers)
 }
 
 func randomNumberInclusive(min, max float64) int {
-	return int(min + rand.Float64()*(max-min))
+	num := min + rand.Float64()*(max-min)
+	//fmt.Println(num, int(num))
+	return int(num)
 }
