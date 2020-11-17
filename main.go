@@ -1,3 +1,10 @@
+/********************************
+*		 GROUP Members		*
+	Carla Warde - 17204542
+	Vainqueur Kayombo - 17199387 
+	Vincent Kiely - 17236282
+	Áine Reynolds - 17231515
+*********************************/
 package main
 
 import (
@@ -32,6 +39,8 @@ var lastCustomerGenerated = time.Now()
 var clock = time.Now()
 var totalCustomers = 0
 var currentNumOfCustomers = 0
+var aineTest = 0
+var customersLostDueToImpatients = 0
 var running = true
 
 /********************************
@@ -44,6 +53,7 @@ type automatic struct {
 
 type customer struct {
 	numOfItems int
+	patient bool
 }
 
 type cashier struct {
@@ -140,10 +150,19 @@ func (a *automatic) GenerateCustomers() {
 		//if a certain amount of time has passed since the last customer was generated generate a new customer
 		if time.Now().Sub(lastCustomerGenerated) > (time.Millisecond * time.Duration(a.generationRate)) {
 			//generate customer
-			customer := customer{randomNumberInclusive(1, 200)}
+			var patient bool
+			patientInt := randomNumberInclusive(1,3)
+			if patientInt == 1 {
+				patient = true
+			} else {
+				patient = false
+			}
+			customer := customer{randomNumberInclusive(1, 200), patient}
+			//fmt.Printf("Customer patient attribute: %t\n", customer.patient)
 			//add to customer array
 			customers = append(customers, customer)
 			currentNumOfCustomers++
+			aineTest++
 			totalCustomers++
 			lastCustomerGenerated = time.Now()
 		}
@@ -157,6 +176,7 @@ func (a *automatic) LookForSpaceInQueue() {
 		//check if customers are waiting
 		if len(customers) > 0 {
 			customer := customers[0]
+			//patient := customer.patient
 			//checks if customer can use fast queue
 			if customer.numOfItems <= fastQueueMaxNumOfItems && hasFastTill {
 				//find fast queue index
@@ -170,7 +190,6 @@ func (a *automatic) LookForSpaceInQueue() {
 			if index == -1 {
 				//fmt.Println("no available queue")
 				//logic for if there's no queue available for the customer
-
 			} else {
 				//if customer is added remove customer from array
 				if tills[index].AddCustomerToQueue(customer) {
@@ -231,9 +250,17 @@ func (t *till) AddCustomerToQueue(c customer) bool {
 		return false
 	} else {
 		//add logic for impatient customer
-
-		//adds customer to queue
-		t.queue <- c
+		tillNum := len(tills)
+		//impatient customer will leave if there is more than 2 people in each queue
+		numOfCustomerForImpatientToLeave := tillNum * 2
+		if aineTest > numOfCustomerForImpatientToLeave && c.patient == false {
+			fmt.Println("Customer is impatient and leaving")
+			customersLostDueToImpatients++
+			aineTest--
+		}else{
+			//adds customer to queue
+			t.queue <- c
+		}
 		return true
 	}
 }
@@ -241,6 +268,7 @@ func (t *till) AddCustomerToQueue(c customer) bool {
 func (c *cashier) ScanItems(customer customer) {
 	scanTime := customer.numOfItems * c.scanSpeed
 	time.Sleep(time.Duration(scanTime) * time.Millisecond)
+	aineTest--
 }
 
 /********************************
@@ -257,7 +285,8 @@ func main() {
 	//stop automatic processes
 	running = false
 	fmt.Printf("Current customers: %d\n", currentNumOfCustomers)
-	fmt.Printf("Total number of customers: %d", totalCustomers)
+	fmt.Printf("Total number of customers: %d\n", totalCustomers)
+	fmt.Printf("Total number of impatient customers lost: %d\n", customersLostDueToImpatients)
 }
 
 func randomNumberInclusive(min, max float64) int {
