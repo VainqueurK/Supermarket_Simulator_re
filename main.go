@@ -40,6 +40,7 @@ var clock = time.Now()
 var totalCustomers = 0
 var currentNumOfCustomers = 0
 var numOfCutomersInShop = 0
+var numOfOpenTills = 0
 var customersLostDueToImpatients = 0
 var running = true
 
@@ -65,6 +66,7 @@ type till struct {
 	employee      cashier
 	queue         chan customer
 	name          int
+	open bool
 }
 
 type manager struct{}
@@ -88,6 +90,8 @@ func (a *automatic) RunSimulator() {
 	for i := 0; i < len(tills); i++ {
 		go tills[i].SendCustomerToCashier()
 	}
+
+	go a.OpenTillIfBusy()
 	//runtime
 	time.Sleep(60 * time.Second)
 }
@@ -95,7 +99,7 @@ func (a *automatic) RunSimulator() {
 func (m *manager) GenerateTills() {
 	//generate random number for the num of tills
 	numOfTills := randomNumberInclusive(minNumOfTills, maxNumOfTills)
-	tills = make([]till, numOfTills)
+	tills = make([]till, maxNumOfTills)
 
 	index := 0
 	//guarantee fast till is generated if numOfTills > 1, and that if numOfTills == 1 it's a regular till
@@ -119,7 +123,7 @@ func (m *manager) GenerateTills() {
 
 	maxItemsTill := 1
 	//generate the rest of the tills randomly
-	for i := index; i < numOfTills; i++ {
+	for i := index; i < 8; i++ {
 		tills[i] = till{name: (i + 1)}
 		//randomly decide if the till has a max number of items
 		maxItemsTill = randomNumberInclusive(1, 100)
@@ -128,6 +132,11 @@ func (m *manager) GenerateTills() {
 		} else {
 			tills[i].SetUpTill(true)
 		}
+	}
+
+	for i := 0; i < numOfTills; i++ {
+		tills[i].open = true
+		numOfOpenTills++
 	}
 }
 
@@ -142,6 +151,7 @@ func (t *till) SetUpTill(maxItemsTill bool) {
 	t.employee = cashier{randomNumberInclusive(minCashierSpeed, maxCashierSpeed)}
 	//the tills queue
 	t.queue = make(chan customer, queueLength)
+	t.open = false
 }
 
 func (a *automatic) GenerateCustomers() {
@@ -201,12 +211,31 @@ func (a *automatic) LookForSpaceInQueue() {
 	}
 }
 
+func (a *automatic) OpenTillIfBusy(){
+	for running {
+		time.Sleep(80 * time.Millisecond)
+		numOfPossibleCustomersForTills := numOfOpenTills * 7
+
+		if numOfOpenTills < 8 && numOfPossibleCustomersForTills < currentNumOfCustomers {
+			tills[numOfOpenTills].open = true
+			numOfOpenTills++
+			fmt.Println("Opening another Till")
+		}
+
+		if numOfOpenTills > 1 && numOfPossibleCustomersForTills > currentNumOfCustomers{
+			tills[numOfOpenTills-1].open = false
+			numOfOpenTills--
+			fmt.Println("Closing a Till")
+		}
+	}
+}
+
 func shortestAvailableQueue(numOfItems int) int {
 	min := queueLength
 	var tillIndex = -1
 	//loop through array and find till with the shortest queue that the customer can go to
 	for i := 0; i < len(tills); i++ {
-		if len(tills[i].queue) < min && numOfItems <= tills[i].maxNumOfItems {
+		if len(tills[i].queue) < min && numOfItems <= tills[i].maxNumOfItems && tills[i].open == true{
 			min = len(tills[i].queue)
 			tillIndex = i
 		}
@@ -236,7 +265,7 @@ func (t *till) SendCustomerToCashier() {
 		} else {
 			//removes customer from queue
 			currentCustomer := <-t.queue
-			fmt.Printf("Scanning %d items in Till %d\n", currentCustomer.numOfItems, t.name)
+			//fmt.Printf("Scanning %d items in Till %d\n", currentCustomer.numOfItems, t.name)
 			//call a method for the cashier to start scanning items
 			t.employee.ScanItems(currentCustomer)
 		}
@@ -285,6 +314,7 @@ func main() {
 	running = false
 	fmt.Printf("Current customers: %d\n", currentNumOfCustomers)
 	fmt.Printf("Total number of customers: %d\n", totalCustomers)
+	fmt.Printf("Total number of tills open: %d\n", numOfOpenTills)
 	fmt.Printf("Total number of impatient customers lost: %d\n", customersLostDueToImpatients)
 }
 
