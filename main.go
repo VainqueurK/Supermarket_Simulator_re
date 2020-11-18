@@ -55,6 +55,8 @@ type till struct {
 	employee      cashier
 	queue         chan customer
 	name          int
+	scannedItems  int
+	tillUsage     int
 }
 
 type manager struct{}
@@ -79,12 +81,12 @@ func (a *automatic) RunSimulator() {
 		go tills[i].SendCustomerToCashier()
 	}
 	//runtime
-	time.Sleep(60 * time.Second)
+	time.Sleep(30 * time.Second)
 }
 
 func (m *manager) GenerateTills() {
 	//generate random number for the num of tills
-	numOfTills := randomNumberInclusive(minNumOfTills, maxNumOfTills)
+	numOfTills := 2 //randomNumberInclusive(minNumOfTills, maxNumOfTills)
 	tills = make([]till, numOfTills)
 
 	index := 0
@@ -101,7 +103,7 @@ func (m *manager) GenerateTills() {
 		hasFastTill = true
 	} else {
 		//guaranteed regular till
-		tills[0] = till{name: 2}
+		tills[0] = till{name: 1}
 		tills[0].SetUpTill(false)
 		index++
 		hasFastTill = false
@@ -220,6 +222,8 @@ func (t *till) SendCustomerToCashier() {
 			fmt.Printf("Scanning %d items in Till %d\n", currentCustomer.numOfItems, t.name)
 			//call a method for the cashier to start scanning items
 			t.employee.ScanItems(currentCustomer)
+			t.tillUsage++
+			t.scannedItems += currentCustomer.numOfItems
 		}
 	}
 }
@@ -257,7 +261,11 @@ func main() {
 	//stop automatic processes
 	running = false
 	fmt.Printf("Current customers: %d\n", currentNumOfCustomers)
-	fmt.Printf("Total number of customers: %d", totalCustomers)
+	fmt.Printf("Total number of customers: %d\n", totalCustomers)
+	for i := 0; i < len(tills); i++ {
+		fmt.Printf("Number of items scanned by till %d: %d\n", tills[i].name, tills[i].scannedItems)
+		fmt.Printf("Number of customers processed by till %d: %d\n", tills[i].name, tills[i].tillUsage)
+	}
 }
 
 func randomNumberInclusive(min, max float64) int {
