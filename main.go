@@ -39,7 +39,7 @@ var lastCustomerGenerated = time.Now()
 var clock = time.Now()
 var totalCustomers = 0
 var currentNumOfCustomers = 0
-var aineTest = 0
+var numOfCutomersInShop = 0
 var customersLostDueToImpatients = 0
 var running = true
 
@@ -162,7 +162,7 @@ func (a *automatic) GenerateCustomers() {
 			//add to customer array
 			customers = append(customers, customer)
 			currentNumOfCustomers++
-			aineTest++
+			numOfCutomersInShop++
 			totalCustomers++
 			lastCustomerGenerated = time.Now()
 		}
@@ -249,14 +249,13 @@ func (t *till) AddCustomerToQueue(c customer) bool {
 		//fmt.Println("queue full")
 		return false
 	} else {
-		//add logic for impatient customer
 		tillNum := len(tills)
 		//impatient customer will leave if there is more than 2 people in each queue
 		numOfCustomerForImpatientToLeave := tillNum * 2
-		if aineTest > numOfCustomerForImpatientToLeave && c.patient == false {
-			fmt.Println("Customer is impatient and leaving")
+		if numOfCutomersInShop > numOfCustomerForImpatientToLeave && c.patient == false {
+			//fmt.Println("Customer is impatient and leaving")
 			customersLostDueToImpatients++
-			aineTest--
+			numOfCutomersInShop--
 		}else{
 			//adds customer to queue
 			t.queue <- c
@@ -268,7 +267,7 @@ func (t *till) AddCustomerToQueue(c customer) bool {
 func (c *cashier) ScanItems(customer customer) {
 	scanTime := customer.numOfItems * c.scanSpeed
 	time.Sleep(time.Duration(scanTime) * time.Millisecond)
-	aineTest--
+	numOfCutomersInShop--
 }
 
 /********************************
