@@ -213,7 +213,7 @@ func (a *automatic) LookForSpaceInQueue() {
 
 func (a *automatic) OpenTillIfBusy(){
 	for running {
-		time.Sleep(80 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 		numOfPossibleCustomersForTills := numOfOpenTills * 7
 
 		if numOfOpenTills < 8 && numOfPossibleCustomersForTills < currentNumOfCustomers {
@@ -278,9 +278,8 @@ func (t *till) AddCustomerToQueue(c customer) bool {
 		//fmt.Println("queue full")
 		return false
 	} else {
-		tillNum := len(tills)
 		//impatient customer will leave if there is more than 2 people in each queue
-		numOfCustomerForImpatientToLeave := tillNum * 2
+		numOfCustomerForImpatientToLeave := numOfOpenTills * 4
 		if numOfCutomersInShop > numOfCustomerForImpatientToLeave && c.patient == false {
 			//fmt.Println("Customer is impatient and leaving")
 			customersLostDueToImpatients++
