@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"runtime"
+	"strconv"
 	"time"
 )
 
@@ -106,11 +107,14 @@ func (a *automatic) RunSimulator() {
 func getInputs() {
 	var input string
 	valid := false
+
+	//Runs for loop until there is a valid input for the day
 	for !valid {
 		//Get inputs from the command line to decide date
 		fmt.Println("Enter the Day of the Week you wish to simulate: ")
 		fmt.Println("a)Monday b)Tuesday c)Wednesday d)Thursday e)Friday f)Saturday g)Sunday")
 		fmt.Scanln(&input)
+		//Uses a switch statement to go through the different cases to set the day the simulator will simulate
 		switch input {
 		case daysOfTheWeek[0]:
 			fmt.Println("The chosen day is Monday")
@@ -145,8 +149,25 @@ func getInputs() {
 			fmt.Println("Example Usage: Enter a for Monday")
 		}
 	}
-	fmt.Println("Enter the number of seconds you want the program to run for: ")
-	fmt.Scanln(&timeRunning)
+
+	valid = false
+	//Runs for loop until there is a valid input for the runtime
+	for !valid {
+		fmt.Println("Enter the number of seconds you want the program to run for: ")
+		fmt.Scanln(&input)
+		//Checks to see if the input is an int
+		_, err := strconv.ParseInt(input, 10, 64)
+		if bool(err == nil) == true {
+			//If the input is an int it will convert the string to an int and end the for loop
+			if i, hmm := strconv.Atoi(input); hmm == nil {
+				valid = true
+				timeRunning = int(i)
+			}
+		} else {
+			fmt.Println("Error: Invalid Input Detected")
+			fmt.Println("Input should be in the form of an integer")
+		}
+	}
 }
 
 func (m *manager) GenerateTills() {
