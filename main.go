@@ -36,6 +36,7 @@ const (
 *********************************/
 var tills []till
 var hasFastTill bool
+var daysOfTheWeek = [...]string{"a", "b", "c", "d", "e", "f", "g"}
 
 //we're gonna have to put this array behind a mutex lock at some point
 var customers []customer
@@ -46,6 +47,8 @@ var clock = time.Now()
 var totalCustomers = 0
 var currentNumOfCustomers = 0
 var running = true
+var timeRunning = 0
+var day float64 = 0
 
 /********************************
 *	        STRUCTS				*
@@ -80,11 +83,14 @@ type manager struct{}
 
 func (a *automatic) RunSimulator() {
 	running = true
+	//Get user input for day and runtime
+	getInputs()
 	//create manager agent and generate tills
 	manager := manager{}
 	manager.GenerateTills()
 	//determine initial generation rate
-	a.generationRate = float64(((maxNumOfTills + 1) - len(tills)) * 20)
+	a.generationRate = float64((((maxNumOfTills + 1) - len(tills)) * 20))
+	a.generationRate = a.generationRate * day
 	//create two goroutines that will continuously generate customers and try to add them to a queue
 	go a.GenerateCustomers()
 	go a.LookForSpaceInQueue()
@@ -94,7 +100,53 @@ func (a *automatic) RunSimulator() {
 		go tills[i].SendCustomerToCashier()
 	}
 	//runtime
-	time.Sleep(30 * time.Second)
+	time.Sleep(time.Duration(timeRunning) * time.Second)
+}
+
+func getInputs() {
+	var input string
+	valid := false
+	for !valid {
+		//Get inputs from the command line to decide date
+		fmt.Println("Enter the Day of the Week you wish to simulate: ")
+		fmt.Println("a)Monday b)Tuesday c)Wednesday d)Thursday e)Friday f)Saturday g)Sunday")
+		fmt.Scanln(&input)
+		switch input {
+		case daysOfTheWeek[0]:
+			fmt.Println("The chosen day is Monday")
+			valid = true
+			day = MONDAY
+		case daysOfTheWeek[1]:
+			fmt.Println("The chosen day is Tuesday")
+			valid = true
+			day = TUESDAY
+		case daysOfTheWeek[2]:
+			fmt.Println("The chosen day is Wednesday")
+			valid = true
+			day = WEDNESDAY
+		case daysOfTheWeek[3]:
+			fmt.Println("The chosen day is Thursday")
+			valid = true
+			day = THURSDAY
+		case daysOfTheWeek[4]:
+			fmt.Println("The chosen day is Friday")
+			valid = true
+			day = FRIDAY
+		case daysOfTheWeek[5]:
+			fmt.Println("The chosen day is Saturday")
+			valid = true
+			day = SATURDAY
+		case daysOfTheWeek[6]:
+			fmt.Println("The chosen day is Sunday")
+			valid = true
+			day = SUNDAY
+		default:
+			fmt.Println("Error: Invalid Input Detected")
+			fmt.Println("Example Usage: Enter a for Monday")
+		}
+	}
+	fmt.Println("Enter the number of seconds you want the program to run for: ")
+	fmt.Scanln(&timeRunning)
 }
 
 func (m *manager) GenerateTills() {
