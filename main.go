@@ -10,13 +10,26 @@ import (
 /********************************
 *		    CONSTANTS			*
 *********************************/
-const normalQueueMaxNumOfItems = 200
-const fastQueueMaxNumOfItems = 20
-const maxNumOfTills = 8
-const minNumOfTills = 1
-const minCashierSpeed = 1
-const maxCashierSpeed = 5
-const queueLength = 6
+const (
+	normalQueueMaxNumOfItems = 200
+	fastQueueMaxNumOfItems   = 20
+	maxNumOfTills            = 8
+	minNumOfTills            = 1
+	minCashierSpeed          = 1
+	maxCashierSpeed          = 5
+	queueLength              = 6
+)
+
+//Days of the week variables
+const (
+	MONDAY    = 1.25
+	TUESDAY   = 1.5
+	WEDNESDAY = 2
+	THURSDAY  = 1
+	FRIDAY    = 0.8
+	SATURDAY  = 0.7
+	SUNDAY    = 0.5
+)
 
 /********************************
 *	    GLOBAL VARIABLES		*
@@ -55,6 +68,8 @@ type till struct {
 	employee      cashier
 	queue         chan customer
 	name          int
+	scannedItems  int
+	tillUsage     int
 }
 
 type manager struct{}
@@ -79,7 +94,7 @@ func (a *automatic) RunSimulator() {
 		go tills[i].SendCustomerToCashier()
 	}
 	//runtime
-	time.Sleep(60 * time.Second)
+	time.Sleep(30 * time.Second)
 }
 
 func (m *manager) GenerateTills() {
@@ -101,7 +116,7 @@ func (m *manager) GenerateTills() {
 		hasFastTill = true
 	} else {
 		//guaranteed regular till
-		tills[0] = till{name: 2}
+		tills[0] = till{name: 1}
 		tills[0].SetUpTill(false)
 		index++
 		hasFastTill = false
@@ -220,6 +235,8 @@ func (t *till) SendCustomerToCashier() {
 			fmt.Printf("Scanning %d items in Till %d\n", currentCustomer.numOfItems, t.name)
 			//call a method for the cashier to start scanning items
 			t.employee.ScanItems(currentCustomer)
+			t.tillUsage++
+			t.scannedItems += currentCustomer.numOfItems
 		}
 	}
 }
@@ -257,7 +274,11 @@ func main() {
 	//stop automatic processes
 	running = false
 	fmt.Printf("Current customers: %d\n", currentNumOfCustomers)
-	fmt.Printf("Total number of customers: %d", totalCustomers)
+	fmt.Printf("Total number of customers: %d\n", totalCustomers)
+	for i := 0; i < len(tills); i++ {
+		fmt.Printf("Number of items scanned by till %d: %d\n", tills[i].name, tills[i].scannedItems)
+		fmt.Printf("Number of customers processed by till %d: %d\n", tills[i].name, tills[i].tillUsage)
+	}
 }
 
 func randomNumberInclusive(min, max float64) int {
