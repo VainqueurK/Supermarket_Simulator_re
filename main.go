@@ -371,7 +371,7 @@ func (t *till) AddCustomerToQueue(c customer) bool {
 	} else {
 		//impatient customer will leave if there is more than 2 people in each queue
 		numOfCustomerForImpatientToLeave := numOfOpenTills * 4
-		fmt.Printf("Num of people in queue: %d\nNum of customers for impatient: %d\n", numOfPeopleInQueue, numOfCustomerForImpatientToLeave)
+		//fmt.Printf("Num of people in queue: %d\nNum of customers for impatient: %d\n", numOfPeopleInQueue, numOfCustomerForImpatientToLeave)
 		if numOfPeopleInQueue > numOfCustomerForImpatientToLeave && c.patient == false {
 			//fmt.Println("Customer is impatient and leaving")
 			customersLostDueToImpatients++
