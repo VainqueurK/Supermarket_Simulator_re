@@ -10,13 +10,26 @@ import (
 /********************************
 *		    CONSTANTS			*
 *********************************/
-const normalQueueMaxNumOfItems = 200
-const fastQueueMaxNumOfItems = 20
-const maxNumOfTills = 8
-const minNumOfTills = 1
-const minCashierSpeed = 1
-const maxCashierSpeed = 5
-const queueLength = 6
+const (
+	normalQueueMaxNumOfItems = 200
+	fastQueueMaxNumOfItems   = 20
+	maxNumOfTills            = 8
+	minNumOfTills            = 1
+	minCashierSpeed          = 1
+	maxCashierSpeed          = 5
+	queueLength              = 6
+)
+
+//Days of the week variables
+const (
+	MONDAY    = 1.25
+	TUESDAY   = 1.5
+	WEDNESDAY = 2
+	THURSDAY  = 1
+	FRIDAY    = 0.8
+	SATURDAY  = 0.7
+	SUNDAY    = 0.5
+)
 
 /********************************
 *	    GLOBAL VARIABLES		*
@@ -86,7 +99,7 @@ func (a *automatic) RunSimulator() {
 
 func (m *manager) GenerateTills() {
 	//generate random number for the num of tills
-	numOfTills := 2 //randomNumberInclusive(minNumOfTills, maxNumOfTills)
+	numOfTills := randomNumberInclusive(minNumOfTills, maxNumOfTills)
 	tills = make([]till, numOfTills)
 
 	index := 0
