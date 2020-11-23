@@ -40,6 +40,7 @@ var clock = time.Now()
 var totalCustomers = 0
 var currentNumOfCustomers = 0
 var numOfCutomersInShop = 0
+var numOfPeopleInQueue = 0
 var numOfOpenTills = 0
 var customersLostDueToImpatients = 0
 var running = true
@@ -93,7 +94,7 @@ func (a *automatic) RunSimulator() {
 
 	go a.OpenTillIfBusy()
 	//runtime
-	time.Sleep(60 * time.Second)
+	time.Sleep(30 * time.Second)
 }
 
 func (m *manager) GenerateTills() {
@@ -115,7 +116,7 @@ func (m *manager) GenerateTills() {
 		hasFastTill = true
 	} else {
 		//guaranteed regular till
-		tills[0] = till{name: 2}
+		tills[0] = till{name: 1}
 		tills[0].SetUpTill(false)
 		index++
 		hasFastTill = false
@@ -213,19 +214,19 @@ func (a *automatic) LookForSpaceInQueue() {
 
 func (a *automatic) OpenTillIfBusy(){
 	for running {
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 		numOfPossibleCustomersForTills := numOfOpenTills * 7
 
 		if numOfOpenTills < 8 && numOfPossibleCustomersForTills < currentNumOfCustomers {
 			tills[numOfOpenTills].open = true
 			numOfOpenTills++
-			fmt.Println("Opening another Till")
+			fmt.Printf("Opening another Till num %d\n", tills[numOfOpenTills-1].name)
 		}
 
 		if numOfOpenTills > 1 && numOfPossibleCustomersForTills > currentNumOfCustomers{
 			tills[numOfOpenTills-1].open = false
 			numOfOpenTills--
-			fmt.Println("Closing a Till")
+			fmt.Printf("Closing a Till num %d\n", tills[numOfOpenTills].name)
 		}
 	}
 }
@@ -280,13 +281,15 @@ func (t *till) AddCustomerToQueue(c customer) bool {
 	} else {
 		//impatient customer will leave if there is more than 2 people in each queue
 		numOfCustomerForImpatientToLeave := numOfOpenTills * 4
-		if numOfCutomersInShop > numOfCustomerForImpatientToLeave && c.patient == false {
+		fmt.Printf("Num of people in queue: %d\nNum of customers for impatient: %d\n", numOfPeopleInQueue, numOfCustomerForImpatientToLeave)
+		if numOfPeopleInQueue > numOfCustomerForImpatientToLeave && c.patient == false {
 			//fmt.Println("Customer is impatient and leaving")
 			customersLostDueToImpatients++
 			numOfCutomersInShop--
 		}else{
 			//adds customer to queue
 			t.queue <- c
+			numOfPeopleInQueue++
 		}
 		return true
 	}
@@ -295,6 +298,7 @@ func (t *till) AddCustomerToQueue(c customer) bool {
 func (c *cashier) ScanItems(customer customer) {
 	scanTime := customer.numOfItems * c.scanSpeed
 	time.Sleep(time.Duration(scanTime) * time.Millisecond)
+	numOfPeopleInQueue--
 	numOfCutomersInShop--
 }
 
