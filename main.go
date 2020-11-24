@@ -53,6 +53,7 @@ var lastCustomerGenerated = time.Now()
 //we'll use this in the future
 var clock = time.Now()
 var totalCustomers = 0
+var customerCount = 0
 var currentNumOfCustomers = 0
 var numOfCutomersInShop = 0
 var numOfPeopleInQueue = 0
@@ -61,6 +62,7 @@ var customersLostDueToImpatients = 0
 var running = true
 var timeRunning = 0
 var day float64 = 0
+var avgWaitTimne = 0
 
 /********************************
 *	        STRUCTS				*
@@ -73,6 +75,8 @@ type automatic struct {
 type customer struct {
 	numOfItems int
 	patient bool
+	stime time.Time
+	waitTime float64
 }
 
 type cashier struct {
@@ -256,7 +260,8 @@ func (a *automatic) GenerateCustomers() {
 			} else {
 				patient = false
 			}
-			customer := customer{randomNumberInclusive(1, 200), patient}
+
+			customer := customer{randomNumberInclusive(1, 200), patient, time.Now() , 0.0}
 			//fmt.Printf("Customer patient attribute: %t\n", customer.patient)
 			//add to customer array
 			customers = append(customers, customer)
@@ -308,13 +313,13 @@ func (a *automatic) OpenTillIfBusy(){
 		if numOfOpenTills < 8 && numOfPossibleCustomersForTills < currentNumOfCustomers {
 			tills[numOfOpenTills].open = true
 			numOfOpenTills++
-			fmt.Printf("Opening another Till num %d\n", tills[numOfOpenTills-1].name)
+			//fmt.Printf("Opening another Till num %d\n", tills[numOfOpenTills-1].name)
 		}
 
 		if numOfOpenTills > 1 && numOfPossibleCustomersForTills > currentNumOfCustomers{
 			tills[numOfOpenTills-1].open = false
 			numOfOpenTills--
-			fmt.Printf("Closing a Till num %d\n", tills[numOfOpenTills].name)
+			//fmt.Printf("Closing a Till num %d\n", tills[numOfOpenTills].name)
 		}
 	}
 }
@@ -386,8 +391,16 @@ func (t *till) AddCustomerToQueue(c customer) bool {
 }
 
 func (c *cashier) ScanItems(customer customer) {
+	customerCount++
 	scanTime := customer.numOfItems * c.scanSpeed
 	time.Sleep(time.Duration(scanTime) * time.Millisecond)
+	endTime := time.Now()
+	waitT := float64(endTime.Sub(customer.stime).Milliseconds())
+	millisecPerRealHour:= float64((float64(timeRunning)/ 12)/1000)
+	custWaitT := waitT * millisecPerRealHour
+	//fmt.Printf("Time running = %d waitT = %f milliPerSec = %f\n", timeRunning,waitT, milliPerRealSec)
+	customer.waitTime = custWaitT * 1000 * 60
+	fmt.Printf("Customer num %d wait time = %f minutes\n", customerCount, custWaitT)
 	numOfPeopleInQueue--
 	numOfCutomersInShop--
 }
