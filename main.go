@@ -62,7 +62,7 @@ var customersLostDueToImpatients = 0
 var running = true
 var timeRunning = 0
 var day float64 = 0
-var avgWaitTimne = 0
+var avgWaitTime float64 = 0
 
 /********************************
 *	        STRUCTS				*
@@ -216,7 +216,7 @@ func (m *manager) GenerateTills() {
 
 	maxItemsTill := 1
 	//generate the rest of the tills randomly
-	for i := index; i < 8; i++ {
+	for i := index; i < numOfTills; i++ {
 		tills[i] = till{name: (i + 1)}
 		//randomly decide if the till has a max number of items
 		maxItemsTill = randomNumberInclusive(1, 100)
@@ -341,7 +341,7 @@ func shortestFastQueue() int {
 	min := queueLength
 	index := -1
 	for i := 0; i < len(tills); i++ {
-		if len(tills[i].queue) < min && tills[i].maxNumOfItems == fastQueueMaxNumOfItems {
+		if len(tills[i].queue) < min && tills[i].maxNumOfItems == fastQueueMaxNumOfItems && tills[i].open == true{
 			min = len(tills[i].queue)
 			index = i
 		}
@@ -369,15 +369,21 @@ func (t *till) SendCustomerToCashier() {
 }
 
 func (t *till) AddCustomerToQueue(c customer) bool {
+	var leave bool
 	//checks if queue is full
 	if len(t.queue) == cap(t.queue) {
 		//fmt.Println("queue full")
 		return false
 	} else {
-		//impatient customer will leave if there is more than 2 people in each queue
-		numOfCustomerForImpatientToLeave := numOfOpenTills * 4
+		//impatient customer will leave if there is more than 4 people in each queue
+		leave = false
+		for i := 0; i < len(tills); i++ {
+			if len(tills[i].queue) > 4 {
+				leave = true
+			}
+		}
 		//fmt.Printf("Num of people in queue: %d\nNum of customers for impatient: %d\n", numOfPeopleInQueue, numOfCustomerForImpatientToLeave)
-		if numOfPeopleInQueue > numOfCustomerForImpatientToLeave && c.patient == false {
+		if leave == true  && c.patient == false {
 			//fmt.Println("Customer is impatient and leaving")
 			customersLostDueToImpatients++
 			numOfCutomersInShop--
@@ -394,13 +400,19 @@ func (c *cashier) ScanItems(customer customer) {
 	customerCount++
 	scanTime := customer.numOfItems * c.scanSpeed
 	time.Sleep(time.Duration(scanTime) * time.Millisecond)
+
+	//calculate the wait time by getting the difference between their start time and the current time
 	endTime := time.Now()
 	waitT := float64(endTime.Sub(customer.stime).Milliseconds())
+	//Convert the seconds inputted by the user to make them relevent to a 12 hour day in the supermarket and convert to milliseconds
 	millisecPerRealHour:= float64((float64(timeRunning)/ 12)/1000)
+	// Get the actual customer wait time in relation to a day.
 	custWaitT := waitT * millisecPerRealHour
 	//fmt.Printf("Time running = %d waitT = %f milliPerSec = %f\n", timeRunning,waitT, milliPerRealSec)
-	customer.waitTime = custWaitT * 1000 * 60
-	fmt.Printf("Customer num %d wait time = %f minutes\n", customerCount, custWaitT)
+	customer.waitTime = custWaitT
+	//Add up all the wait times to use to get the average
+	avgWaitTime = float64(avgWaitTime) + customer.waitTime
+	fmt.Printf("Customer num %d wait time = %f minutes\n", customerCount, customer.waitTime)
 	numOfPeopleInQueue--
 	numOfCutomersInShop--
 }
@@ -422,6 +434,7 @@ func main() {
 	fmt.Printf("Total number of customers: %d\n", totalCustomers)
 	fmt.Printf("Total number of tills open: %d\n", numOfOpenTills)
 	fmt.Printf("Total number of impatient customers lost: %d\n", customersLostDueToImpatients)
+	fmt.Printf("Average customer wait time: %d minutes\n", (int(avgWaitTime)/customerCount))
 	for i := 0; i < len(tills); i++ {
 		fmt.Printf("Number of items scanned by till %d: %d\n", tills[i].name, tills[i].scannedItems)
 		fmt.Printf("Number of customers processed by till %d: %d\n", tills[i].name, tills[i].tillUsage)
