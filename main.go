@@ -1,5 +1,6 @@
 /********************************
 *		 GROUP Members		*
+	Group Name = Clean up on aisle 3
 	Carla Warde - 17204542
 	Vainqueur Kayombo - 17199387 
 	Vincent Kiely - 17236282
