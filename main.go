@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"math/rand"
 	"runtime"
-	//"strconv"
+	"strconv"
 	"time"
 )
 
@@ -47,6 +47,7 @@ const (
 var tills []till
 var hasFastTill bool
 var daysOfTheWeek = [...]string{"a", "b", "c", "d", "e", "f", "g"}
+var weather = [...]string{"a", "b", "c", "d", "e"}
 
 var customers []customer
 var lastCustomerGenerated = time.Now()
@@ -62,6 +63,10 @@ var customersLostDueToImpatients = 0
 var running = true
 var day float64 = 0
 var avgWaitTime float64 = 0
+
+var weatherDelay float64 // V
+var dayDelay float64     //run method to set this when simulator is run
+var delay float64        //dayDelay * weatherDelay
 
 /********************************
 *	        STRUCTS				*
@@ -106,10 +111,12 @@ func (a *automatic) RunSimulator() {
 	//create manager agent and generate tills
 	manager := manager{}
 	manager.GenerateTills()
+
 	//determine initial generation rate
-	twoMinInMilli := (millisecPerRealHour/60) * 2
-	a.generationRate = float64(twoMinInMilli)
-	a.generationRate = a.generationRate * day 
+	delay = dayDelay * weatherDelay
+	twoMinInMilli := (millisecPerRealHour/60) * 2 
+	a.generationRate = float64((float64(numOfOpenTills) * twoMinInMilli))
+	a.generationRate = a.generationRate * delay
 	//a.generationRate = a.generationRate * thirtySecInMilli
 	//create two goroutines that will continuously generate customers and try to add them to a queue
 	go a.GenerateCustomers()
@@ -143,36 +150,110 @@ func getInputs() {
 		case daysOfTheWeek[0]:
 			fmt.Println("The chosen day is Monday")
 			valid = true
-			day = MONDAY
+			dayDelay = setDay("MON")
 		case daysOfTheWeek[1]:
 			fmt.Println("The chosen day is Tuesday")
 			valid = true
-			day = TUESDAY
+			dayDelay = setDay("TUE")
 		case daysOfTheWeek[2]:
 			fmt.Println("The chosen day is Wednesday")
 			valid = true
-			day = WEDNESDAY
+			dayDelay = setDay("WED")
 		case daysOfTheWeek[3]:
 			fmt.Println("The chosen day is Thursday")
 			valid = true
-			day = THURSDAY
+			dayDelay = setDay("THUR")
 		case daysOfTheWeek[4]:
 			fmt.Println("The chosen day is Friday")
 			valid = true
-			day = FRIDAY
+			dayDelay = setDay("FRI")
 		case daysOfTheWeek[5]:
 			fmt.Println("The chosen day is Saturday")
 			valid = true
-			day = SATURDAY
+			dayDelay = setDay("SAT")
 		case daysOfTheWeek[6]:
 			fmt.Println("The chosen day is Sunday")
 			valid = true
-			day = SUNDAY
+			dayDelay = setDay("SUN")
 		default:
 			fmt.Println("Error: Invalid Input Detected")
 			fmt.Println("Example Usage: Enter a for Monday")
 		}
-	}	
+	}
+
+	valid = false
+	for !valid {
+		//Get inputs from the command line to decide date
+		fmt.Println("Enter the Day of the Week you wish to simulate: ")
+		fmt.Println("a)Cloudy b)Sunny c)Drizzly d)Heavy Rain e)Snowy")
+		fmt.Scanln(&input)
+		//Uses a switch statement to go through the different cases to set the day the simulator will simulate
+		switch input {
+		case weather[0]:
+			fmt.Println("The chosen weather is 'Cloudy'")
+			valid = true
+			weatherDelay = setWeather("Cloudy")
+		case weather[1]:
+			fmt.Println("The chosen weather is 'Sunny'")
+			valid = true
+			weatherDelay = setWeather("Sunny")
+		case weather[2]:
+			fmt.Println("The chosen weather is 'Drizzly'")
+			valid = true
+			weatherDelay = setWeather("Drizzly")
+		case weather[3]:
+			fmt.Println("The chosen weather is 'Heavy Rain'")
+			valid = true
+			weatherDelay = setWeather("Heavy Rain")
+		case weather[4]:
+			fmt.Println("The chosen weather is 'Snowy'")
+			valid = true
+			weatherDelay = setWeather("Snowy")
+		default:
+			fmt.Println("Error: Invalid Input Detected")
+			fmt.Println("Example Usage: Enter a for Cloudy")
+		}
+	}
+}
+
+func setDay(Day string) float64 {
+	var Delay float64
+
+	switch Day {
+	case "MON":
+		Delay = float64(MONDAY)
+	case "TUE":
+		Delay = float64(TUESDAY)
+	case "WED":
+		Delay = float64(WEDNESDAY)
+	case "THUR":
+		Delay = float64(THURSDAY)
+	case "FRI":
+		Delay = float64(FRIDAY)
+	case "SAT":
+		Delay = float64(SATURDAY)
+	case "SUN":
+		Delay = float64(SUNDAY)
+	}
+	return Delay
+}
+
+func setWeather(Weather string) float64 {
+	var wDelay float64
+
+	switch Weather {
+	case "Drizzle":
+		wDelay = float64(1.1)
+	case "Heavy Rain":
+		wDelay = float64(1.5)
+	case "Sunny":
+		wDelay = float64(0.5)
+	case "Cloudy":
+		wDelay = float64(0.7)
+	case "Snowy":
+		wDelay = float64(1.2)
+	}
+	return wDelay
 }
 
 func (m *manager) GenerateTills() {
