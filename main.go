@@ -407,6 +407,10 @@ func (c *cashier) ScanItems(customer customer) {
 	numOfCutomersInShop--
 }
 
+/*func (t *till) PrintTillStats(){
+
+}*/
+
 /********************************
 *	        FUNCTIONS			*
 *********************************/
@@ -425,7 +429,6 @@ func main() {
 	fmt.Printf("Total number of tills open: %d\n", numOfOpenTills)
 	fmt.Printf("Total number of impatient customers lost: %d\n", customersLostDueToImpatients)
 	fmt.Printf("Average customer wait time: %d minutes\n", (int(avgWaitTime)/customerCount))
-	fmt.Printf("Running time = %d Milliseconds in an hour = %f\n", timeRunning, millisecPerRealHour)
 	for i := 0; i < len(tills); i++ {
 		fmt.Printf("Number of items scanned by till %d: %d\n", tills[i].name, tills[i].scannedItems)
 		fmt.Printf("Number of customers processed by till %d: %d\n", tills[i].name, tills[i].tillUsage)
