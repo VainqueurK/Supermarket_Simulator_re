@@ -10,15 +10,15 @@ package main
 import (
 	"fmt"
 	"math/rand"
-	"runtime"
-	"strconv"
 	"time"
+	"os"
 )
 
 /********************************
 *		    CONSTANTS			*
 *********************************/
 const (
+	minNumOfItems			 = 1
 	normalQueueMaxNumOfItems = 200
 	fastQueueMaxNumOfItems   = 20
 	maxNumOfTills            = 8
@@ -40,12 +40,20 @@ const (
 	SATURDAY  = 0.7
 	SUNDAY    = 0.5
 )
-
+//Weather variables
+const (
+	DRIZZLE 	= 1.1
+	HEAVYRAIN	= 1.5
+	SUNNY 		= 0.5
+	CLOUDY 		= 0.7
+	SNOWY 		= 1.2
+)
 /********************************
 *	    GLOBAL VARIABLES		*
 *********************************/
 var tills []till
 var hasFastTill bool
+var verbose = false
 var daysOfTheWeek = [...]string{"a", "b", "c", "d", "e", "f", "g"}
 var weather = [...]string{"a", "b", "c", "d", "e"}
 
@@ -59,7 +67,8 @@ var customerCount = 0
 var currentNumOfCustomers = 0
 var numOfCutomersInShop = 0
 var numOfOpenTills = 0
-var customersLostDueToImpatients = 0
+var lostCustomers = 0
+var customersLostDueToImpatience = 0
 var running = true
 var day float64 = 0
 var avgWaitTime float64 = 0
@@ -115,14 +124,16 @@ func (a *automatic) RunSimulator() {
 	//determine initial generation rate
 	delay = dayDelay * weatherDelay
 	twoMinInMilli := (millisecPerRealHour/60) * 2 
-	a.generationRate = float64((float64(numOfOpenTills) * twoMinInMilli))
+	a.generationRate = float64(twoMinInMilli)
+	//fmt.Printf("Gen rate before: %f\n", a.generationRate)
 	a.generationRate = a.generationRate * delay
-	//a.generationRate = a.generationRate * thirtySecInMilli
+	//fmt.Printf("Gen rate after: %f\n", a.generationRate)
+
 	//create two goroutines that will continuously generate customers and try to add them to a queue
 	go a.GenerateCustomers()
 	go a.LookForSpaceInQueue()
 
-	//commented lines don't work yet
+	//Create go routines for each till
 	for i := 0; i < len(tills); i++ {
 		go tills[i].SendCustomerToCashier()
 	}
@@ -146,38 +157,9 @@ func getInputs() {
 		fmt.Println("a)Monday b)Tuesday c)Wednesday d)Thursday e)Friday f)Saturday g)Sunday")
 		fmt.Scanln(&input)
 		//Uses a switch statement to go through the different cases to set the day the simulator will simulate
-		switch input {
-		case daysOfTheWeek[0]:
-			fmt.Println("The chosen day is Monday")
+		dayDelay = setDay(input)
+		if dayDelay != -1.0 {
 			valid = true
-			dayDelay = setDay("MON")
-		case daysOfTheWeek[1]:
-			fmt.Println("The chosen day is Tuesday")
-			valid = true
-			dayDelay = setDay("TUE")
-		case daysOfTheWeek[2]:
-			fmt.Println("The chosen day is Wednesday")
-			valid = true
-			dayDelay = setDay("WED")
-		case daysOfTheWeek[3]:
-			fmt.Println("The chosen day is Thursday")
-			valid = true
-			dayDelay = setDay("THUR")
-		case daysOfTheWeek[4]:
-			fmt.Println("The chosen day is Friday")
-			valid = true
-			dayDelay = setDay("FRI")
-		case daysOfTheWeek[5]:
-			fmt.Println("The chosen day is Saturday")
-			valid = true
-			dayDelay = setDay("SAT")
-		case daysOfTheWeek[6]:
-			fmt.Println("The chosen day is Sunday")
-			valid = true
-			dayDelay = setDay("SUN")
-		default:
-			fmt.Println("Error: Invalid Input Detected")
-			fmt.Println("Example Usage: Enter a for Monday")
 		}
 	}
 
@@ -188,71 +170,67 @@ func getInputs() {
 		fmt.Println("a)Cloudy b)Sunny c)Drizzly d)Heavy Rain e)Snowy")
 		fmt.Scanln(&input)
 		//Uses a switch statement to go through the different cases to set the day the simulator will simulate
-		switch input {
-		case weather[0]:
-			fmt.Println("The chosen weather is 'Cloudy'")
+		weatherDelay = setWeather(input)
+		if weatherDelay != -1.0 {
 			valid = true
-			weatherDelay = setWeather("Cloudy")
-		case weather[1]:
-			fmt.Println("The chosen weather is 'Sunny'")
-			valid = true
-			weatherDelay = setWeather("Sunny")
-		case weather[2]:
-			fmt.Println("The chosen weather is 'Drizzly'")
-			valid = true
-			weatherDelay = setWeather("Drizzly")
-		case weather[3]:
-			fmt.Println("The chosen weather is 'Heavy Rain'")
-			valid = true
-			weatherDelay = setWeather("Heavy Rain")
-		case weather[4]:
-			fmt.Println("The chosen weather is 'Snowy'")
-			valid = true
-			weatherDelay = setWeather("Snowy")
-		default:
-			fmt.Println("Error: Invalid Input Detected")
-			fmt.Println("Example Usage: Enter a for Cloudy")
 		}
 	}
 }
 
-func setDay(Day string) float64 {
-	var Delay float64
+func setDay(input string) float64 {
+	var delay = -1.0
 
-	switch Day {
-	case "MON":
-		Delay = float64(MONDAY)
-	case "TUE":
-		Delay = float64(TUESDAY)
-	case "WED":
-		Delay = float64(WEDNESDAY)
-	case "THUR":
-		Delay = float64(THURSDAY)
-	case "FRI":
-		Delay = float64(FRIDAY)
-	case "SAT":
-		Delay = float64(SATURDAY)
-	case "SUN":
-		Delay = float64(SUNDAY)
+	switch input {
+		case daysOfTheWeek[0]:
+			fmt.Println("The chosen day is Monday")
+			delay = MONDAY
+		case daysOfTheWeek[1]:
+			fmt.Println("The chosen day is Tuesday")
+			delay = TUESDAY
+		case daysOfTheWeek[2]:
+			fmt.Println("The chosen day is Wednesday")
+			delay = WEDNESDAY
+		case daysOfTheWeek[3]:
+			fmt.Println("The chosen day is Thursday")
+			delay = THURSDAY
+		case daysOfTheWeek[4]:
+			fmt.Println("The chosen day is Friday")
+			delay = FRIDAY
+		case daysOfTheWeek[5]:
+			fmt.Println("The chosen day is Saturday")
+			delay = SATURDAY
+		case daysOfTheWeek[6]:
+			fmt.Println("The chosen day is Sunday")
+			delay = SUNDAY
+		default:
+			fmt.Println("Error: Invalid Input Detected")
+			fmt.Println("Example Usage: Enter 'a' for Monday")
 	}
-	return Delay
+	return delay
 }
 
-func setWeather(Weather string) float64 {
-	var wDelay float64
-
-	switch Weather {
-	case "Drizzle":
-		wDelay = float64(1.1)
-	case "Heavy Rain":
-		wDelay = float64(1.5)
-	case "Sunny":
-		wDelay = float64(0.5)
-	case "Cloudy":
-		wDelay = float64(0.7)
-	case "Snowy":
-		wDelay = float64(1.2)
-	}
+func setWeather(input string) float64 {
+	var wDelay = -1.0
+	switch input {
+		case weather[0]:
+			fmt.Println("The chosen weather is 'Cloudy'")
+			wDelay = CLOUDY
+		case weather[1]:
+			fmt.Println("The chosen weather is 'Sunny'")
+			wDelay = SUNNY
+		case weather[2]:
+			fmt.Println("The chosen weather is 'Drizzly'")
+			wDelay = DRIZZLE
+		case weather[3]:
+			fmt.Println("The chosen weather is 'Heavy Rain'")
+			wDelay = HEAVYRAIN
+		case weather[4]:
+			fmt.Println("The chosen weather is 'Snowy'")
+			wDelay = SNOWY
+		default:
+			fmt.Println("Error: Invalid Input Detected")
+			fmt.Println("Example Usage: Enter 'a' for Cloudy")
+		}
 	return wDelay
 }
 
@@ -272,13 +250,13 @@ func (m *manager) GenerateTills() {
 	index++
 	hasFastTill = true
 
-	//maxItemsTill := 1
 	//generate the rest of the tills as regular tills
 	for i := index; i < maxNumOfTills; i++ {
 		tills[i] = till{name: (i + 1)}
 		tills[i].SetUpTill(false)
 	}
 
+	//Open random number of tills
 	for i := 0; i < numOfTills; i++ {
 		tills[i].open = true
 		numOfOpenTills++
@@ -304,16 +282,17 @@ func (a *automatic) GenerateCustomers() {
 		//if a certain amount of time has passed since the last customer was generated generate a new customer
 		if time.Now().Sub(lastCustomerGenerated) > (time.Millisecond * time.Duration(a.generationRate)) {
 			//fmt.Printf("Time now - last customer generated = %v\n",time.Now().Sub(lastCustomerGenerated))
-			//generate customer
+			//Generate odds of customer being impatient
 			var patient bool
 			patientInt := randomNumberInclusive(1,3)
-			if patientInt == 1 {
+			if patientInt > 1 {
 				patient = true
 			} else {
 				patient = false
 			}
 
-			customer := customer{int(randomNumberInclusive(1, 200)), patient, time.Now() , 0.0}
+			//Generate customer with random number of items
+			customer := customer{int(randomNumberInclusive(minNumOfItems, normalQueueMaxNumOfItems)), patient, time.Now() , 0.0}
 			//fmt.Printf("Customer patient attribute: %t\n", customer.patient)
 			//add to customer array
 			customers = append(customers, customer)
@@ -328,13 +307,13 @@ func (a *automatic) GenerateCustomers() {
 func (a *automatic) LookForSpaceInQueue() {
 	var index int
 	for running {
-		//Check for space every minute
+		//Check for space every 5 seconds
 		fiveSecInMilli := ((millisecPerRealHour/60)/60) * 5
 		time.Sleep(time.Duration(fiveSecInMilli) * time.Millisecond)
 		//check if customers are waiting
 		if len(customers) > 0 {
 			customer := customers[0]
-			//patient := customer.patient
+
 			//checks if customer can use fast queue
 			if customer.numOfItems <= fastQueueMaxNumOfItems && hasFastTill {
 				//find fast queue index
@@ -344,19 +323,22 @@ func (a *automatic) LookForSpaceInQueue() {
 				index = shortestAvailableQueue(customer.numOfItems)
 			}
 
-			//if no queue is found index == -1
+			//if no queue has less than 6 we lose the customer
 			if index == -1 {
-				//fmt.Println("no available queue")
-				//logic for if there's no queue available for the customer
+				lostCustomers++
+				numOfCutomersInShop--
+				customers = customers[1:]
+				currentNumOfCustomers--
 			} else {
-				//if customer is added remove customer from array
+				//if customer is impatient and the length of the shortest queue is 4 they leave
 				if len(tills[index].queue) > 3   && customer.patient == false {
-					customersLostDueToImpatients++
+					customersLostDueToImpatience++
 					numOfCutomersInShop--
 					customers = customers[1:]
 					currentNumOfCustomers--
 					continue
 				}else{
+					//Send customer to queue
 					tills[index].AddCustomerToQueue(customer) 
 					customers = customers[1:]
 					currentNumOfCustomers--
@@ -373,6 +355,7 @@ func (a *automatic) OpenTillIfBusy(){
 		if time.Now().Sub(lastTillChanged) >  (time.Millisecond * time.Duration(twentyMinInMilli)){
 			lenOfQueues := 0
 			numTills := 0
+			//Get average length of the queues
 			for i:=0; i < numOfOpenTills; i++{
 				if tills[i].maxNumOfItems == 200{
 					lenOfQueues += len(tills[i].queue)
@@ -380,8 +363,9 @@ func (a *automatic) OpenTillIfBusy(){
 				}
 			}
 			lenOfQueues = lenOfQueues/numTills
+			//If average length of queues is above three open till
 			if numOfOpenTills < 8 && lenOfQueues > 3 {
-				fmt.Printf("Time difference between now and last Till changed = %v\n", time.Now().Sub(lastTillChanged))
+				//fmt.Printf("Time difference between now and last Till changed = %v\n", time.Now().Sub(lastTillChanged))
 				tills[numOfOpenTills].open = true
 				tills[numOfOpenTills].lastUsed = time.Now()
 				tills[numOfOpenTills].maxNumOfItems = 200
@@ -398,6 +382,7 @@ func (a *automatic) CloseTills(){
 		twentyMinInMilli := (millisecPerRealHour/60) * 20
 		fortyMinInMilli := (millisecPerRealHour/60) * 40
 		if time.Now().Sub(lastTillChanged) >  (time.Millisecond * time.Duration(fortyMinInMilli)) {
+			//Close till if it wasn't used in the last 20 min
 			if numOfOpenTills > 2 &&  time.Now().Sub(tills[numOfOpenTills-1].lastUsed) > (time.Millisecond * time.Duration(twentyMinInMilli)){
 				tills[numOfOpenTills-1].open = false
 				numOfOpenTills--
@@ -422,6 +407,7 @@ func shortestAvailableQueue(numOfItems int) int {
 }
 
 func shortestFastQueue() int {
+	//loop through array and find till with the shortest fast queue that the customer can go to
 	min := queueLength
 	index := -1
 	for i := 0; i < len(tills); i++ {
@@ -457,7 +443,9 @@ func (t *till) SendCustomerToCashier() {
 			currentCustomer.waitTime = (custWaitT / 1000)/60
 			//Add up all the wait times to use to get the average
 			avgWaitTime = float64(avgWaitTime) + currentCustomer.waitTime
-			fmt.Printf("Customer num %d wait time = %f minutes in till: %d\n", customerCount, currentCustomer.waitTime, t.name)
+			if verbose{
+				fmt.Printf("Customer num %d wait time = %f minutes in till: %d\n", customerCount, currentCustomer.waitTime, t.name)
+			}			
 			//fmt.Printf("Scanning %d items in Till %d\n", currentCustomer.numOfItems, t.name)
 			//call a method for the cashier to start scanning items
 			t.employee.ScanItems(currentCustomer)
@@ -473,7 +461,6 @@ func (t *till) AddCustomerToQueue(c customer) bool {
 		//fmt.Println("queue full")
 		return false
 	} else {
-
 		//adds customer to queue
 		t.queue <- c
 		t.lastUsed = time.Now()
@@ -482,37 +469,49 @@ func (t *till) AddCustomerToQueue(c customer) bool {
 }
 
 func (c *cashier) ScanItems(customer customer) {
-	threeSec := (((millisecPerRealHour)/60)/60) * 3
-	scanTime := float64(customer.numOfItems) * c.scanSpeed * threeSec
+	//1 item takes 2 seconds to scan multiplied by cashier scan speed
+	twoSec := (((millisecPerRealHour)/60)/60) * 2
+	scanTime := float64(customer.numOfItems) * c.scanSpeed * twoSec
 	time.Sleep(time.Duration(scanTime) * time.Millisecond)
 	numOfCutomersInShop--
 }
 
-/*func (t *till) PrintTillStats(){
-
-}*/
+func (t *till) String() string{
+	return fmt.Sprintf("Till %d stats:\n\tTill open: %t\n\tMax num of items: %d\n\t" +
+						"Cashier Scan speed: %.2f\n\tNumber of Items scanned: %d\n\t" +
+						"Number of customers processed: %d\n", 
+						t.name, t.open, t.maxNumOfItems, t.employee.scanSpeed, t.scannedItems, t.tillUsage)
+}
 
 /********************************
 *	        FUNCTIONS			*
 *********************************/
 
 func main() {
+	//Check if user wants verbose to print customer wait times
+	args := os.Args[1:]
+	if args != nil {
+		if args[0] == "-v"{
+			fmt.Println("Verbose mode selected")
+			verbose = true
+		} 
+	}
+	
 	rand.Seed(time.Now().UnixNano())
 	//run simulator
 	automatic := automatic{}
 	automatic.RunSimulator()
-	fmt.Println(tills)
-	fmt.Println(fmt.Println(runtime.NumGoroutine()))
 	//stop automatic processes
 	running = false
+	time.Sleep(20 * time.Millisecond)
 	fmt.Printf("Current customers: %d\n", currentNumOfCustomers)
 	fmt.Printf("Total number of customers: %d\n", totalCustomers)
 	fmt.Printf("Total number of tills open: %d\n", numOfOpenTills)
-	fmt.Printf("Total number of impatient customers lost: %d\n", customersLostDueToImpatients)
+	fmt.Printf("Total number of patient customers lost: %d\n", lostCustomers)
+	fmt.Printf("Total number of impatient customers lost: %d\n", customersLostDueToImpatience)
 	fmt.Printf("Average customer wait time: %d minutes\n", (int(avgWaitTime)/customerCount))
 	for i := 0; i < len(tills); i++ {
-		fmt.Printf("Number of items scanned by till %d: %d\n", tills[i].name, tills[i].scannedItems)
-		fmt.Printf("Number of customers processed by till %d: %d\n", tills[i].name, tills[i].tillUsage)
+		fmt.Println(tills[i].String())
 	}
 }
 
