@@ -1,3 +1,10 @@
+/********************************
+*		 GROUP Members		*
+	Carla Warde - 17204542
+	Vainqueur Kayombo - 17199387 
+	Vincent Kiely - 17236282
+	Áine Reynolds - 17231515
+*********************************/
 package main
 
 import (
@@ -47,10 +54,17 @@ var lastCustomerGenerated = time.Now()
 //we'll use this in the future
 var clock = time.Now()
 var totalCustomers = 0
+var customerCount = 0
 var currentNumOfCustomers = 0
+var numOfCutomersInShop = 0
+var numOfPeopleInQueue = 0
+var numOfOpenTills = 0
+var customersLostDueToImpatients = 0
 var running = true
+var millisecPerRealHour float64 = 0
 var timeRunning = 0
 var day float64 = 0
+var avgWaitTime float64 = 0
 
 var weatherDelay float64 // V
 var dayDelay float64     //run method to set this when simulator is run
@@ -66,6 +80,9 @@ type automatic struct {
 
 type customer struct {
 	numOfItems int
+	patient bool
+	stime time.Time
+	waitTime float64
 }
 
 type cashier struct {
@@ -77,6 +94,7 @@ type till struct {
 	employee      cashier
 	queue         chan customer
 	name          int
+	open bool
 	scannedItems  int
 	tillUsage     int
 }
@@ -97,8 +115,10 @@ func (a *automatic) RunSimulator() {
 
 	//determine initial generation rate
 	delay = dayDelay * weatherDelay
-	a.generationRate = (float64(((maxNumOfTills + 1) - len(tills)) * 20)) * delay
-
+	twoMinInMilli := (millisecPerRealHour/60) * 2 
+	a.generationRate = float64((float64(numOfOpenTills) * twoMinInMilli))
+	a.generationRate = a.generationRate * delay
+	//a.generationRate = a.generationRate * thirtySecInMilli
 	//create two goroutines that will continuously generate customers and try to add them to a queue
 	go a.GenerateCustomers()
 	go a.LookForSpaceInQueue()
@@ -107,6 +127,9 @@ func (a *automatic) RunSimulator() {
 	for i := 0; i < len(tills); i++ {
 		go tills[i].SendCustomerToCashier()
 	}
+
+	//Create a go rountine that consistently checks if tills should be opened or closed depending on the number of people in the supermarket
+	go a.OpenTillIfBusy()
 	//runtime
 	time.Sleep(time.Duration(timeRunning) * time.Second)
 }
@@ -209,6 +232,8 @@ func getInputs() {
 			fmt.Println("Input should be in the form of an integer")
 		}
 	}
+	// make the time inputted by the user relevant to a 12 hour working day in the supermarket
+	millisecPerRealHour = float64((float64(timeRunning)/ 12) * 1000)
 }
 
 func setDay(Day string) float64 {
@@ -254,7 +279,7 @@ func setWeather(Weather string) float64 {
 func (m *manager) GenerateTills() {
 	//generate random number for the num of tills
 	numOfTills := randomNumberInclusive(minNumOfTills, maxNumOfTills)
-	tills = make([]till, numOfTills)
+	tills = make([]till, maxNumOfTills)
 
 	index := 0
 	//guarantee fast till is generated if numOfTills > 1, and that if numOfTills == 1 it's a regular till
@@ -278,7 +303,7 @@ func (m *manager) GenerateTills() {
 
 	maxItemsTill := 1
 	//generate the rest of the tills randomly
-	for i := index; i < numOfTills; i++ {
+	for i := index; i < maxNumOfTills; i++ {
 		tills[i] = till{name: (i + 1)}
 		//randomly decide if the till has a max number of items
 		maxItemsTill = randomNumberInclusive(1, 100)
@@ -287,6 +312,11 @@ func (m *manager) GenerateTills() {
 		} else {
 			tills[i].SetUpTill(true)
 		}
+	}
+
+	for i := 0; i < numOfTills; i++ {
+		tills[i].open = true
+		numOfOpenTills++
 	}
 }
 
@@ -301,6 +331,7 @@ func (t *till) SetUpTill(maxItemsTill bool) {
 	t.employee = cashier{randomNumberInclusive(minCashierSpeed, maxCashierSpeed)}
 	//the tills queue
 	t.queue = make(chan customer, queueLength)
+	t.open = false
 }
 
 func (a *automatic) GenerateCustomers() {
@@ -309,10 +340,20 @@ func (a *automatic) GenerateCustomers() {
 		//if a certain amount of time has passed since the last customer was generated generate a new customer
 		if time.Now().Sub(lastCustomerGenerated) > (time.Millisecond * time.Duration(a.generationRate)) {
 			//generate customer
-			customer := customer{randomNumberInclusive(1, 200)}
+			var patient bool
+			patientInt := randomNumberInclusive(1,3)
+			if patientInt == 1 {
+				patient = true
+			} else {
+				patient = false
+			}
+
+			customer := customer{randomNumberInclusive(1, 200), patient, time.Now() , 0.0}
+			//fmt.Printf("Customer patient attribute: %t\n", customer.patient)
 			//add to customer array
 			customers = append(customers, customer)
 			currentNumOfCustomers++
+			numOfCutomersInShop++
 			totalCustomers++
 			lastCustomerGenerated = time.Now()
 		}
@@ -322,10 +363,13 @@ func (a *automatic) GenerateCustomers() {
 func (a *automatic) LookForSpaceInQueue() {
 	var index int
 	for running {
-		time.Sleep(20 * time.Millisecond)
+		//Check for space every minute
+		oneMinInMilli := (millisecPerRealHour/60)
+		time.Sleep(time.Duration(oneMinInMilli) * time.Millisecond)
 		//check if customers are waiting
 		if len(customers) > 0 {
 			customer := customers[0]
+			//patient := customer.patient
 			//checks if customer can use fast queue
 			if customer.numOfItems <= fastQueueMaxNumOfItems && hasFastTill {
 				//find fast queue index
@@ -339,9 +383,13 @@ func (a *automatic) LookForSpaceInQueue() {
 			if index == -1 {
 				//fmt.Println("no available queue")
 				//logic for if there's no queue available for the customer
-
 			} else {
 				//if customer is added remove customer from array
+				if len(tills[index].queue) > 3   && customer.patient == false {
+					customersLostDueToImpatients++
+					numOfCutomersInShop--
+					continue
+				}
 				if tills[index].AddCustomerToQueue(customer) {
 					customers = customers[1:]
 					currentNumOfCustomers--
@@ -351,12 +399,33 @@ func (a *automatic) LookForSpaceInQueue() {
 	}
 }
 
+func (a *automatic) OpenTillIfBusy(){
+	for running {
+		//check tills every 10minutes 
+		tenMinInMilli := (millisecPerRealHour/60) * 10
+		time.Sleep(time.Duration(tenMinInMilli) * time.Millisecond)
+		numOfPossibleCustomersForTills := numOfOpenTills * 7
+
+		if numOfOpenTills < 8 && numOfPossibleCustomersForTills < currentNumOfCustomers {
+			tills[numOfOpenTills].open = true
+			numOfOpenTills++
+			//fmt.Printf("Opening another Till num %d\n", tills[numOfOpenTills-1].name)
+		}
+
+		if numOfOpenTills > 1 && numOfPossibleCustomersForTills > currentNumOfCustomers{
+			tills[numOfOpenTills-1].open = false
+			numOfOpenTills--
+			//fmt.Printf("Closing a Till num %d\n", tills[numOfOpenTills].name)
+		}
+	}
+}
+
 func shortestAvailableQueue(numOfItems int) int {
 	min := queueLength
 	var tillIndex = -1
 	//loop through array and find till with the shortest queue that the customer can go to
 	for i := 0; i < len(tills); i++ {
-		if len(tills[i].queue) < min && numOfItems <= tills[i].maxNumOfItems {
+		if len(tills[i].queue) < min && numOfItems <= tills[i].maxNumOfItems && tills[i].open == true{
 			min = len(tills[i].queue)
 			tillIndex = i
 		}
@@ -368,7 +437,7 @@ func shortestFastQueue() int {
 	min := queueLength
 	index := -1
 	for i := 0; i < len(tills); i++ {
-		if len(tills[i].queue) < min && tills[i].maxNumOfItems == fastQueueMaxNumOfItems {
+		if len(tills[i].queue) < min && tills[i].maxNumOfItems == fastQueueMaxNumOfItems && tills[i].open == true{
 			min = len(tills[i].queue)
 			index = i
 		}
@@ -386,7 +455,7 @@ func (t *till) SendCustomerToCashier() {
 		} else {
 			//removes customer from queue
 			currentCustomer := <-t.queue
-			fmt.Printf("Scanning %d items in Till %d\n", currentCustomer.numOfItems, t.name)
+			//fmt.Printf("Scanning %d items in Till %d\n", currentCustomer.numOfItems, t.name)
 			//call a method for the cashier to start scanning items
 			t.employee.ScanItems(currentCustomer)
 			t.tillUsage++
@@ -401,17 +470,33 @@ func (t *till) AddCustomerToQueue(c customer) bool {
 		//fmt.Println("queue full")
 		return false
 	} else {
-		//add logic for impatient customer
 
 		//adds customer to queue
 		t.queue <- c
+		numOfPeopleInQueue++
 		return true
 	}
 }
 
 func (c *cashier) ScanItems(customer customer) {
+	customerCount++
 	scanTime := customer.numOfItems * c.scanSpeed
 	time.Sleep(time.Duration(scanTime) * time.Millisecond)
+
+	//calculate the wait time by getting the difference between their start time and the current time
+	endTime := time.Now()
+	waitT := float64(endTime.Sub(customer.stime).Milliseconds())
+	
+	// Get the actual customer wait time in relation to a day.
+	custWaitT := waitT * millisecPerRealHour
+	//fmt.Printf("Time running = %d waitT = %f milliPerSec = %f\n", timeRunning,waitT, milliPerRealSec)
+	//Get each customer wait time in minutes and assign it to the customer
+	customer.waitTime = (custWaitT / 1000)/60
+	//Add up all the wait times to use to get the average
+	avgWaitTime = float64(avgWaitTime) + customer.waitTime
+	fmt.Printf("Customer num %d wait time = %f minutes\n", customerCount, customer.waitTime)
+	numOfPeopleInQueue--
+	numOfCutomersInShop--
 }
 
 /********************************
@@ -429,6 +514,9 @@ func main() {
 	running = false
 	fmt.Printf("Current customers: %d\n", currentNumOfCustomers)
 	fmt.Printf("Total number of customers: %d\n", totalCustomers)
+	fmt.Printf("Total number of tills open: %d\n", numOfOpenTills)
+	fmt.Printf("Total number of impatient customers lost: %d\n", customersLostDueToImpatients)
+	fmt.Printf("Average customer wait time: %d minutes\n", (int(avgWaitTime)/customerCount))
 	for i := 0; i < len(tills); i++ {
 		fmt.Printf("Number of items scanned by till %d: %d\n", tills[i].name, tills[i].scannedItems)
 		fmt.Printf("Number of customers processed by till %d: %d\n", tills[i].name, tills[i].tillUsage)
