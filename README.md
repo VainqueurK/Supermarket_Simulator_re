@@ -1,7 +1,6 @@
 <h2>Info:</h2>
 <p><b>Title: Supermarket Simulator</p>
 <p><b>Description: </b>Simulates a user selected day in a virtual supermarket under chosen weather conditions</p>
-<p><b>Last Updated: </b>29/11/2020</p>
 <p><b>Author(s): </b>Aine Reynolds, Carla Warde, Vainqueur Kayombo, Vincent Kiely</p>
 <p><b>Utilised: </b>Golang, Concurrency</p>
 
